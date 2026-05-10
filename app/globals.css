@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-inter: var(--font-inter-sans);
+}
+
+:root {
+  --color: #9ae19d;
+}
+.font-sans-big {
+  font-family: var(--font-geist-sans);
+  letter-spacing: -3%;
+}
+.font-sans-sm {
+  font-family: var(--font-geist-sans);
+  letter-spacing: -1%;
+}
+.font-inter-big {
+  font-family: var(--font-inter-sans);
+  letter-spacing: -3%;
+}
+.font-inter-sm {
+  font-family: var(--font-inter-sans);
+  letter-spacing: -1%;
+}
+
+body {
+  background-color: #f5f5f5;
+}
+
+.btn {
+  background: var(--color);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.2),
+    inset 0 0 6px 2px rgba(255, 255, 255, 0.24),
+    0 0 0 1px var(--color),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.user_message {
+  background: var(--color);
+
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.2),
+    inset 0 0 6px 2px rgba(255, 255, 255, 0.24),
+    0 0 0 1px var(--color),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.reset-btn {
+  background-color: black;
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.2),
+    inset 0 0 6px 2px rgba(255, 255, 255, 0.24),
+    0 0 0 1px black,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+/* ── Cards ───────────────────────────────────────────────────────────────────
+   All share a 1px #E5E7EB border ring as the base layer.
+   Shadow color is #030712 (near-black) at varying opacities.
+*/
+
+/* Level 1 — Raised, diagonal depth */
+.card-1 {
+  box-shadow:
+    0 0 0 1px #e5e7eb,
+    5px 5px 10px rgba(3, 7, 18, 0.24),
+    -5px -5px 10px rgba(3, 7, 18, 0.12);
+}
+
+/* Level 2 — Subtle lift */
+.card-2 {
+  box-shadow:
+    0 0 0 1px #e5e7eb,
+    0 2px 3px rgba(3, 7, 18, 0.2);
+}
+
+/* Level 3 — Diffused float */
+.card-3 {
+  box-shadow:
+    0 0 0 1px #e5e7eb,
+    2px 4px 24px rgba(3, 7, 18, 0.2),
+    0 2px 6px rgba(3, 7, 18, 0.16);
+}
+
+/* Level 4 — Deep elevation */
+.card-4 {
+  box-shadow:
+    0 0 0 1px #e5e7eb,
+    8px 6px 36px rgba(3, 7, 18, 0.28),
+    0 4px 16px rgba(3, 7, 18, 0.12);
+}
+
+.send-btn {
+  background: var(--color);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.2),
+    inset 0 0 6px 2px rgba(255, 255, 255, 0.24),
+    0 0 0 1px var(--color),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  /* box-shadow: var(--shadow-btn); */
+}
