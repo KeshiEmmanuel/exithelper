@@ -11,19 +11,20 @@ import { sendDeanApprovalEmail, sendStudentNotificationEmail } from "@/resend";
 
 export const runtime = "nodejs";
 
+// Next.js 16: params is now Promise<{token: string}> — must be awaited
+
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { token: string } },
+  { params }: { params: Promise<{ token: string }> },
 ) {
   try {
-    const { token } = params;
+    const { token } = await params;
 
     if (!token || typeof token !== "string" || token.length < 32) {
       return NextResponse.json({ error: "Invalid token." }, { status: 400 });
     }
 
     const tokenRecord = await validateApprovalToken(token);
-
     if (!tokenRecord) {
       return NextResponse.json(
         {
@@ -35,7 +36,6 @@ export async function GET(
     }
 
     const request = await getExeatRequestById(tokenRecord.request_id);
-
     if (!request) {
       return NextResponse.json(
         { error: "Exeat request not found." },
@@ -43,7 +43,6 @@ export async function GET(
       );
     }
 
-    // Validate that this token's role matches the current expected action
     const expectedRole =
       request.status === "pending_hod"
         ? "hod"
@@ -90,16 +89,12 @@ export async function GET(
   }
 }
 
-// ============================================================
-// POST — Process the approval/rejection decision
-// ============================================================
-
 export async function POST(
   req: NextRequest,
-  { params }: { params: { token: string } },
+  { params }: { params: Promise<{ token: string }> },
 ) {
   try {
-    const { token } = params;
+    const { token } = await params;
 
     if (!token || typeof token !== "string" || token.length < 32) {
       return NextResponse.json({ error: "Invalid token." }, { status: 400 });
@@ -120,9 +115,7 @@ export async function POST(
 
     const cleanComment = (comment ?? "").trim().slice(0, 500);
 
-    // Validate token (checks expiry & not-used)
     const tokenRecord = await validateApprovalToken(token);
-
     if (!tokenRecord) {
       return NextResponse.json(
         {
@@ -133,9 +126,7 @@ export async function POST(
       );
     }
 
-    // Get full request
     const request = await getExeatRequestById(tokenRecord.request_id);
-
     if (!request) {
       return NextResponse.json(
         { error: "Exeat request not found." },
@@ -143,7 +134,6 @@ export async function POST(
       );
     }
 
-    // Verify the request is still in the expected state
     const expectedRole =
       request.status === "pending_hod"
         ? "hod"
@@ -153,18 +143,14 @@ export async function POST(
 
     if (!expectedRole || tokenRecord.role !== expectedRole) {
       return NextResponse.json(
-        {
-          error:
-            "This request has already been processed and is no longer awaiting your action.",
-        },
+        { error: "This request has already been processed." },
         { status: 409 },
       );
     }
 
-    // Mark token as used BEFORE updating status (prevent double submissions)
+    // Consume token BEFORE status update — prevents race-condition double submissions
     await consumeApprovalToken(tokenRecord.id);
 
-    // Update request status
     const updatedRequest = await updateExeatRequestStatus(
       request.id,
       tokenRecord.role,
@@ -172,13 +158,9 @@ export async function POST(
       cleanComment,
     );
 
-    // ---- SIDE EFFECTS ----
-
     if (decision === "approve" && tokenRecord.role === "hod") {
-      // Forward to Dean
       const dean = getDeanEmail();
       const deanToken = await createApprovalToken(request.id, "dean");
-
       await sendDeanApprovalEmail({
         deanEmail: dean.email,
         studentName: request.student.full_name,
@@ -193,7 +175,6 @@ export async function POST(
         requestId: request.id,
       });
     } else if (tokenRecord.role === "dean" || decision === "reject") {
-      // Final decision — notify student
       await sendStudentNotificationEmail({
         studentEmail: request.student.email,
         studentName: request.student.full_name,
@@ -211,8 +192,8 @@ export async function POST(
         decision === "approve"
           ? tokenRecord.role === "hod"
             ? "Request approved and forwarded to the Dean of Student Affairs."
-            : "Request has been finally approved. The student has been notified."
-          : "Request has been rejected. The student has been notified.",
+            : "Request finally approved. The student has been notified."
+          : "Request rejected. The student has been notified.",
     });
   } catch (err) {
     console.error("[API /approve POST]", err);

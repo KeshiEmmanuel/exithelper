@@ -1,28 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HumanMessage } from "@langchain/core/messages";
-import { exeatAgentGraph } from "@/langgraph/graph";
-import { toUIMessageStream } from "@ai-sdk/langchain";
+import { toBaseMessages, toUIMessageStream } from "@ai-sdk/langchain";
 import { createUIMessageStreamResponse } from "ai";
+import type { UIMessage } from "@ai-sdk/react";
+import { exeatAgentGraph } from "@/langgraph/graph";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// --- 1. In-Memory Rate Limiter (with Garbage Collection) ---
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 30;
 const RATE_WINDOW_MS = 60 * 1000;
 
+// Prevent memory leaks by sweeping expired IPs
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of rateLimitMap.entries()) {
+    if (now > data.resetAt) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, RATE_WINDOW_MS);
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
+
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
     return true;
   }
+
   if (entry.count >= RATE_LIMIT) return false;
   entry.count++;
   return true;
 }
 
+// --- 2. Stream Interceptor (Gemini Bug Fix) ---
+async function* sanitizeGeminiStream(stream: AsyncIterable<any>) {
+  for await (const event of stream) {
+    // LangGraph often emits [chunk, metadata] tuples. We handle both tuple and raw chunk.
+    const isTuple = Array.isArray(event);
+    const chunk = isTuple ? event[0] : event;
+
+    // Mutate the chunk by reference to fix Gemini's null tool-call content bug
+    if (chunk && typeof chunk === "object") {
+      if (chunk.content === null || chunk.content === undefined) {
+        chunk.content = "";
+      } else if (Array.isArray(chunk.content)) {
+        chunk.content = chunk.content.filter((part: any) => part !== null);
+      }
+    }
+
+    // Yield the exact same structure back to Vercel (mutated by reference)
+    yield chunk;
+  }
+}
+
+// --- 3. Route Handler ---
 export async function POST(req: NextRequest) {
   try {
     const ip =
@@ -38,61 +73,41 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { message, threadId } = body as {
-      message: string;
-      threadId: string;
-    };
+    const { id, messages } = body as { id: string; messages: UIMessage[] };
 
-    if (!message || typeof message !== "string") {
+    if (!id || typeof id !== "string") {
       return NextResponse.json(
-        { error: "Invalid request: message is required." },
+        { error: "thread ID is required." },
         { status: 400 },
       );
     }
 
-    if (!threadId || typeof threadId !== "string") {
+    if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
-        { error: "Invalid request: threadId is required." },
+        { error: "messages array cannot be empty." },
         { status: 400 },
       );
     }
 
-    const sanitizedMessage = message.slice(0, 2000).trim();
-    if (!sanitizedMessage) {
-      return NextResponse.json(
-        { error: "Message cannot be empty." },
-        { status: 400 },
-      );
-    }
+    // Convert only the last UIMessage to LangChain format
+    const lastUIMessage = messages[messages.length - 1];
+    const langchainMessages = await toBaseMessages([lastUIMessage]);
 
-    const langGraphStream = await exeatAgentGraph.stream(
-      { messages: [new HumanMessage(sanitizedMessage)] },
+    // Stream the graph with messages mode for token-by-token streaming
+    const graphStream = await exeatAgentGraph.stream(
+      { messages: langchainMessages },
       {
-        configurable: { thread_id: threadId },
-        streamMode: ["values", "messages"], // ← array, not a string
+        configurable: { thread_id: id },
+        streamMode: "messages",
       },
     );
 
-    const uiStream = toUIMessageStream(langGraphStream);
-
-    // Tee the stream — one for logging, one for the response
-    const [debugStream, responseStream] = uiStream.tee();
-    (async () => {
-      const reader = debugStream.getReader();
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          console.log("[stream chunk]:", value);
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    })();
-
-    return createUIMessageStreamResponse({ stream: responseStream });
+    // Pipe through the sanitizer into Vercel's adapter
+    return createUIMessageStreamResponse({
+      stream: toUIMessageStream(sanitizeGeminiStream(graphStream)),
+    });
   } catch (error) {
-    console.error("[API /chat] Unhandled error:", error);
+    console.error("[API /chat] error:", error);
     return NextResponse.json(
       { error: "An internal server error occurred. Please try again." },
       { status: 500 },

@@ -8,24 +8,10 @@ import {
 } from "@/supabase/queries";
 import { sendHodApprovalEmail } from "@/resend";
 
-// ============================================================
-// HELPER
-// ============================================================
-
-/**
- * Parse a YYYY-MM-DD string as a local date.
- * Using `new Date("YYYY-MM-DD")` parses as UTC midnight, which causes
- * off-by-one errors in timezones ahead of UTC (e.g. WAT UTC+1).
- * This helper avoids that by constructing the date in local time.
- */
 function parseLocalDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
-
-// ============================================================
-// TOOL: Verify Student Identity
-// ============================================================
 
 export const verifyStudentTool = tool(
   async ({ studentId, fullName }) => {

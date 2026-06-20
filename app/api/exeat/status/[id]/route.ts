@@ -3,12 +3,14 @@ import { getExeatRequestById } from "@/supabase/queries";
 
 export const runtime = "nodejs";
 
+// Next.js 16: params is now Promise<{id: string}> — must be awaited
+
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id || !/^[0-9a-f-]{36}$/.test(id)) {
       return NextResponse.json(
@@ -18,7 +20,6 @@ export async function GET(
     }
 
     const request = await getExeatRequestById(id);
-
     if (!request) {
       return NextResponse.json(
         { error: "Request not found." },

@@ -1,58 +1,45 @@
 "use client";
-
+import ExeatProgressBar from "./ExeatProgressBar";
+import { useExeatStage } from "@/hooks/useExeatStage";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import MessageBubble from "./MessageBubble";
-import { Send, RotateCcw } from "lucide-react";
 import TypingIndicator from "./TypingIndicator";
+import { GraduationCap, Send, RotateCcw, ShieldCheck } from "lucide-react";
+import type { UIMessage } from "@ai-sdk/react";
 
 const THREAD_ID_KEY = "exeat_thread_id";
 
-function getOrCreateThreadId(): string {
-  let tid = sessionStorage.getItem(THREAD_ID_KEY);
-  if (!tid) {
-    tid = uuidv4();
-    sessionStorage.setItem(THREAD_ID_KEY, tid);
-  }
-  return tid;
+function buildWelcome(id = "welcome"): UIMessage {
+  return {
+    id,
+    role: "assistant",
+    parts: [
+      {
+        type: "text",
+        text: "Hello! I'm **ALEX**, your University Exeat Assistant. 👋\n\nI'm here to help you apply for an **exeat** — a formal permission to temporarily leave campus.\n\nWould you like to start an exeat application?",
+      },
+    ],
+    // createdAt: new Date(),
+  };
 }
-
-function extractText(parts: unknown[]): string {
-  if (!Array.isArray(parts)) return "";
-  return parts
-    .filter(
-      (p): p is { type: "text"; text: string } =>
-        typeof p === "object" &&
-        p !== null &&
-        (p as any).type === "text" &&
-        typeof (p as any).text === "string",
-    )
-    .map((p) => p.text)
-    .join("");
-}
-
-const WELCOME_TEXT =
-  "Hey it is Alex here, Would you like to start an exeat application?";
 
 export default function ChatInterface() {
-  const [threadId, setThreadId] = useState<string>("");
-  const [input, setInput] = useState("");
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // sessionStorage is client-only — initialise on mount
+  // Initialize Thread ID on mount safely (Hydration-friendly)
   useEffect(() => {
-    setThreadId(getOrCreateThreadId());
+    const existingId = sessionStorage.getItem(THREAD_ID_KEY);
+    const idToUse = existingId || uuidv4();
+    if (!existingId) sessionStorage.setItem(THREAD_ID_KEY, idToUse);
+    setThreadId(idToUse);
   }, []);
-
-  // Keep a ref so the transport closure always sees the latest threadId
-  // without needing to recreate the transport on every render
-  const threadIdRef = useRef(threadId);
-  useEffect(() => {
-    threadIdRef.current = threadId;
-  }, [threadId]);
 
   const {
     messages,
@@ -60,49 +47,30 @@ export default function ChatInterface() {
     status,
     error,
     setMessages,
-    regenerate,
+    stop,
     clearError,
   } = useChat({
-    onError: (err) => console.error("useChat error:", err),
-    // v5: api / body / headers move into DefaultChatTransport (imported from "ai")
+    id: threadId || "pending-id", // Fallback while mounting
+    messages: [buildWelcome()],
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      // Shape the exact JSON body our API route expects
-      prepareSendMessagesRequest({ messages: msgs }) {
-        const lastMsg = msgs[msgs.length - 1];
-        const text = extractText((lastMsg?.parts as unknown[]) ?? []);
-        console.log(">>> sending:", {
-          text,
-          threadId: threadIdRef.current,
-          parts: lastMsg?.parts,
-        });
-        return {
-          headers: { "Content-Type": "application/json" },
-          body: {
-            message: text,
-            threadId: threadIdRef.current,
-          },
-        };
-      },
+      prepareSendMessagesRequest: ({ id, messages: msgs }) => ({
+        body: { id, messages: msgs },
+      }),
     }),
-    // v5: "initialMessages" renamed to "messages"
-    messages: [
-      {
-        id: "welcome",
-        role: "assistant",
-        parts: [{ type: "text", text: WELCOME_TEXT }],
-      },
-    ],
   });
+  const stage = useExeatStage(messages);
 
-  const isLoading = status === "streaming" || status === "submitted";
+  const isLoading = status === "submitted" || status === "streaming";
 
-  // Auto-scroll to latest message
+  // Auto-scroll to bottom cleanly
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isLoading]);
 
-  // Auto-resize textarea
+  // Auto-resize textarea logic
   const resizeTextarea = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -110,14 +78,16 @@ export default function ChatInterface() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, []);
 
-  const handleSend = useCallback(() => {
-    const text = input.trim();
-    if (!text || isLoading || !threadId) return;
-    // v5: sendMessage({ text }) replaces handleSubmit
-    sendMessage({ text });
-    setInput("");
+  const handleSend = () => {
+    const trimmed = inputValue.trim();
+    if (!trimmed || isLoading || !threadId) return;
+
+    sendMessage({ text: trimmed });
+    setInputValue("");
+
+    // Reset textarea height instantly
     if (inputRef.current) inputRef.current.style.height = "auto";
-  }, [input, isLoading, threadId, sendMessage]);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -127,128 +97,114 @@ export default function ChatInterface() {
   };
 
   const resetConversation = () => {
+    stop();
     const newId = uuidv4();
     sessionStorage.setItem(THREAD_ID_KEY, newId);
     setThreadId(newId);
-    threadIdRef.current = newId;
-    setMessages([
-      {
-        id: "welcome-new",
-        role: "assistant",
-        parts: [
-          {
-            type: "text",
-            text: "Hi! its me Alex,.\n\nWould you like to start an exeat application?",
-          },
-        ],
-      },
-    ]);
-    setInput("");
-    setTimeout(() => inputRef.current?.focus(), 100);
+    setInputValue("");
+    setMessages([buildWelcome(`welcome-${newId}`)]);
+
+    // Safely refocus after React reconciles
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  // Wait for client mount to avoid hydration mismatch
+  if (!threadId) return null;
+
   return (
-    <div className="chat-shell max-w-[600px] py-2  h-screen w-full  mx-auto flex flex-col  justify-between">
+    <div className="chat-shell flex flex-col h-full w-full">
       {/* Header */}
-      <header className="chat-header relative z-10 flex items-center w-full justify-between bg-[#f5f5f5] py-2">
+      <header className="chat-header">
         <div className="header-brand">
-          <div className="header-title font-semibold">ALEX</div>
+          <div className="header-icon">
+            <GraduationCap size={22} strokeWidth={1.8} />
+          </div>
+          <div>
+            <span className="header-title">ALEX</span>
+            <span className="header-sub">Exeat Assistant</span>
+          </div>
         </div>
         <div className="header-actions">
+          <div className="status-pill">
+            <ShieldCheck size={12} />
+            <span>Secure</span>
+          </div>
           <button
-            className="reset-btn text-white p-2 rounded-full"
+            className="reset-btn"
             onClick={resetConversation}
             title="Start new conversation"
             aria-label="Start new conversation"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={15} />
           </button>
         </div>
       </header>
-
+      {/* <ExeatProgressBar stage={stage} /> */}
       {/* Messages */}
       <main
-        className="chat-messages w-full flex flex-col gap-5 flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:hidden"
+        className="chat-messages flex-1 overflow-y-auto p-4"
         role="log"
         aria-live="polite"
-        aria-label="Conversation"
       >
         {messages.map((msg) => {
-          const text = extractText((msg.parts as unknown[]) ?? []);
+          // Check if there are any text parts
+          const hasText = msg.parts?.some(
+            (p) => p.type === "text" && p.text.length > 0,
+          );
+
+          // Detect if a tool is processing but hasn't returned text yet
+          const isProcessingTool =
+            !hasText && msg.toolInvocations && msg.toolInvocations.length > 0;
+
           return (
-            <div key={msg.id} className={`msg-row ${msg.role}`}>
-              {/* <div className={`msg-avatar ${msg.role}`}>
-                {msg.role === "assistant" ? "AI" : "You"}
-              </div> */}
-              <div
-                className={`msg-bubble ${msg.role === "assistant" ? "bg-gray-200  p-2 card-2 rounded-lg mr-20" : "user_message p-2 text-black rounded-lg w-full ml-14  self-end"} ${msg.role}`}
-              >
-                <MessageBubble
-                  message={{
-                    id: msg.id,
-                    role: msg.role as "user" | "assistant",
-                    content: text,
-                    createdAt: new Date(),
-                  }}
-                />
-              </div>
-            </div>
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isProcessingTool={isProcessingTool}
+            />
           );
         })}
-
-        {isLoading && (
-          <div className="typing-row">
-            <TypingIndicator />
-          </div>
-        )}
+        {isLoading && status !== "streaming" && <TypingIndicator />}
 
         {error && (
           <div className="error-banner" role="alert">
-            Something went wrong.{" "}
-            <button
-              onClick={() => {
-                clearError();
-                regenerate();
-              }}
-            >
-              Retry
+            {error.message || "Something went wrong."}
+            <button onClick={() => clearError()} className="underline ml-2">
+              Dismiss
             </button>
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </main>
 
       {/* Input */}
-      <footer className="chat-footer relative z-10 w-full">
-        <div className="bg-gray-200 p-2 card-2 rounded-lg">
-          <div className="input-row bg-white flex flex-col max-w-150 rounded-lg p-4 w-full border-gray-300 border">
-            <textarea
-              ref={inputRef}
-              className="chat-input outline-none w-full resize-none  h-25"
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                resizeTextarea();
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your message… (Enter to send)"
-              rows={1}
-              disabled={isLoading || !threadId}
-              aria-label="Message input"
-              maxLength={2000}
-            />
-            <button
-              className="send-btn self-end p-2 rounded-full text-black"
-              onClick={handleSend}
-              disabled={isLoading || !input.trim() || !threadId}
-              aria-label="Send message"
-            >
-              <Send size={16} strokeWidth={2} />
-            </button>
-          </div>
+      <footer className="chat-footer p-4 border-t">
+        <div className="input-row relative flex items-center">
+          <textarea
+            ref={inputRef}
+            className="chat-input flex-1 resize-none pr-12"
+            value={inputValue}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              resizeTextarea();
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message… (Enter to send)"
+            rows={1}
+            disabled={isLoading || !threadId}
+            aria-label="Message input"
+            maxLength={2000}
+          />
+          <button
+            className="send-btn absolute right-2"
+            onClick={handleSend}
+            disabled={isLoading || !inputValue.trim() || !threadId}
+            aria-label="Send message"
+          >
+            <Send size={18} strokeWidth={2} />
+          </button>
         </div>
-        <p className="text-xs text-center py-4 text-gray-600">
+        <p className="footer-note text-xs text-center mt-2 text-gray-500">
           Your information is handled securely and only used for your exeat
           application.
         </p>
