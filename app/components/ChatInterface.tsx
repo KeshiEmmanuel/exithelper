@@ -152,10 +152,8 @@ export default function ChatInterface() {
             (p) => p.type === "text" && p.text.length > 0,
           );
 
-          // Detect if a tool is processing but hasn't returned text yet
           const isProcessingTool =
-            !hasText && msg.toolInvocations && msg.toolInvocations.length > 0;
-
+            !hasText && msg.parts?.some((p) => p.type === "tool-invocation");
           return (
             <MessageBubble
               key={msg.id}

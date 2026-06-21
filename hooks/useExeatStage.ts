@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { UIMessage } from "@ai-sdk/react";
+import { isToolPart } from "@/types";
 
 export type ExeatStage =
   | "greeting"
@@ -43,15 +44,17 @@ function getAllText(messages: UIMessage[]): string {
     .join(" ")
     .toLowerCase();
 }
-
 function hasToolInState(
   messages: UIMessage[],
   toolName: string,
   states: string[],
 ): boolean {
   return messages.some((m) =>
-    m.toolInvocations?.some(
-      (t) => t.toolName === toolName && states.includes(t.state),
+    m.parts?.some(
+      (p) =>
+        isToolPart(p) &&
+        p.type === `tool-${toolName}` &&
+        states.includes(p.state),
     ),
   );
 }

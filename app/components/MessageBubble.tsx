@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { GraduationCap, User, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import type { UIMessage } from "@ai-sdk/react";
+import { getToolName, isToolActive, isToolPart } from "@/types";
 
 interface MessageBubbleProps {
   message: UIMessage;
@@ -23,45 +24,31 @@ function getFriendlyToolMessage(toolName: string): string {
   );
 }
 
-function formatTime(date?: Date): string {
-  if (!date) return "";
-  return date.toLocaleTimeString("en-NG", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
 export default function MessageBubble({
   message,
   isProcessingTool,
 }: MessageBubbleProps) {
   const isAssistant = message.role === "assistant";
-
-  const timeLabel = useMemo(
-    () => formatTime(message.createdAt),
-    [message.createdAt],
-  );
-
   const textContent = useMemo(() => {
-    if (message.parts && message.parts.length > 0) {
-      return message.parts
-        .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    return (
+      message.parts
+        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
         .map((p) => p.text)
-        .join("");
-    }
-    return typeof message.content === "string" ? message.content : "";
-  }, [message.parts, message.content]);
+        .join("") ?? ""
+    );
+  }, [message.parts]);
 
-  // Check if there is a currently active tool waiting for a result
-  const activeTool = message.toolInvocations?.find(
-    (tool) => tool.state === "call" || tool.state === "partial-call",
+  const activeTool = message.parts?.find(
+    (p): p is ReturnType<typeof Array.prototype.find> =>
+      isToolPart(p) && isToolActive(p),
   );
 
   const isToolRunning = !!activeTool || isProcessingTool;
-  const toolLoadingMessage = activeTool
-    ? getFriendlyToolMessage(activeTool.toolName)
-    : "Checking system...";
+
+  const toolLoadingMessage =
+    activeTool && isToolPart(activeTool)
+      ? getFriendlyToolMessage(getToolName(activeTool))
+      : "Checking system...";
 
   // Hide completely ONLY if there is no text AND no tool is running
   if (!textContent && !isToolRunning) return null;
@@ -134,14 +121,6 @@ export default function MessageBubble({
             </div>
           )}
         </div>
-
-        {timeLabel && (
-          <span
-            className={`bubble-time ${isAssistant ? "bubble-time--left" : "bubble-time--right"}`}
-          >
-            {timeLabel}
-          </span>
-        )}
       </div>
 
       {!isAssistant && (

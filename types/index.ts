@@ -2,6 +2,33 @@
 // DOMAIN TYPES
 // ============================================================
 
+export type ToolInvocationPart = {
+  type: `tool-${string}`;
+  toolCallId: string;
+  title?: string;
+  state: "input-streaming" | "input" | "output" | "error";
+  input: unknown;
+  output?: unknown;
+  errorText?: unknown;
+};
+
+export function isToolPart(p: unknown): p is ToolInvocationPart {
+  return (
+    typeof p === "object" &&
+    p !== null &&
+    typeof (p as { type?: string }).type === "string" &&
+    (p as { type: string }).type.startsWith("tool-")
+  );
+}
+
+export function getToolName(part: ToolInvocationPart): string {
+  return part.type.replace(/^tool-/, "");
+}
+
+export function isToolActive(part: ToolInvocationPart): boolean {
+  return part.state === "input-streaming" || part.state === "input";
+}
+
 export type ApprovalStatus =
   | "pending_hod"
   | "pending_dean"
