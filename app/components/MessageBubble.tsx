@@ -1,7 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
-import { GraduationCap, User, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import type { UIMessage } from "@ai-sdk/react";
 import { getToolName, isToolActive, isToolPart } from "@/types";
@@ -29,6 +29,7 @@ export default function MessageBubble({
   isProcessingTool,
 }: MessageBubbleProps) {
   const isAssistant = message.role === "assistant";
+
   const textContent = useMemo(() => {
     return (
       message.parts
@@ -50,84 +51,88 @@ export default function MessageBubble({
       ? getFriendlyToolMessage(getToolName(activeTool))
       : "Checking system...";
 
-  // Hide completely ONLY if there is no text AND no tool is running
   if (!textContent && !isToolRunning) return null;
 
   return (
-    <div
-      className={`message-row ${isAssistant ? "message-row--assistant" : "message-row--user"}`}
-    >
-      {isAssistant && (
-        <div className="avatar avatar--assistant" aria-hidden="true">
-          <GraduationCap size={16} strokeWidth={1.8} />
-        </div>
-      )}
+    /* Outer row: full-width dashed border container */
+    <div className="max-w-[600px] mx-auto  px-4 py-3 font-instrument">
 
-      <div className="bubble-wrapper">
+      {/* Inner: flex row that pushes bubble left (assistant) or right (user) */}
+      <div
+        className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
+      >
+        {/* Bubble */}
         <div
-          className={`bubble ${isAssistant ? "bubble--assistant" : "bubble--user"}`}
+          className={`
+            max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
+            ${
+              isAssistant
+                ? "bg-white text-gray-800 rounded-tl-sm textbox_shadow"
+                : "bg-primary text-white rounded-tr-sm"
+            }
+          `}
         >
           {textContent &&
             (isAssistant ? (
               <ReactMarkdown
                 components={{
                   code: ({ children }) => (
-                    <code className="inline-code">{children}</code>
+                    <code className="bg-gray-100 rounded px-1 text-xs font-mono">
+                      {children}
+                    </code>
                   ),
                   pre: ({ children }) => (
-                    <pre className="code-block">{children}</pre>
+                    <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto my-1">
+                      {children}
+                    </pre>
                   ),
                   a: ({ href, children }) => (
                     <a
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bubble-link"
+                      className="underline text-blue-600 hover:text-blue-800"
                     >
                       {children}
                     </a>
                   ),
                   p: ({ children }) => (
-                    <p className="bubble-paragraph">{children}</p>
+                    <p className="mb-1 last:mb-0">{children}</p>
                   ),
                   ul: ({ children }) => (
-                    <ul className="bubble-list">{children}</ul>
+                    <ul className="list-disc list-inside my-1 space-y-0.5">
+                      {children}
+                    </ul>
                   ),
                   ol: ({ children }) => (
-                    <ol className="bubble-list bubble-list--ordered">
+                    <ol className="list-decimal list-inside my-1 space-y-0.5">
                       {children}
                     </ol>
                   ),
-                  li: ({ children }) => (
-                    <li className="bubble-list-item">{children}</li>
-                  ),
+                  li: ({ children }) => <li>{children}</li>,
                   strong: ({ children }) => (
-                    <strong className="bubble-strong">{children}</strong>
+                    <strong className="font-semibold">{children}</strong>
                   ),
                 }}
               >
                 {textContent}
               </ReactMarkdown>
             ) : (
-              <p className="bubble-paragraph">{textContent}</p>
+              <p>{textContent}</p>
             ))}
 
           {isToolRunning && (
             <div
-              className={`tool-indicator flex items-center gap-2 text-sm ${textContent ? "mt-2 pt-2 border-t border-gray-200/20 opacity-80" : ""}`}
+              className={`flex items-center gap-1.5 text-xs italic ${
+                textContent ? "mt-2 pt-2 border-t border-gray-200/30 opacity-80" : ""
+              }`}
             >
-              <Loader2 size={14} className="animate-spin" />
-              <span className="italic">{toolLoadingMessage}</span>
+              <Loader2 size={12} className="animate-spin" />
+              <span>{toolLoadingMessage}</span>
             </div>
           )}
         </div>
       </div>
-
-      {!isAssistant && (
-        <div className="avatar avatar--user" aria-hidden="true">
-          <User size={16} strokeWidth={1.8} />
-        </div>
-      )}
     </div>
   );
 }

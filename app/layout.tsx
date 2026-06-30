@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Inter } from "next/font/google";
+import { Instrument_Serif, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const SerifFont = Instrument_Serif({
+  variable: "--font-serif",
   subsets: ["latin"],
+  weight: "400"
 });
 
-const InterFont = Inter({
-  variable: "--font-inter-sans",
+const InstrumentSans  = Instrument_Sans({
+  variable: "--font-instrument-sans",
   subsets: ["latin"],
 });
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${InterFont.variable} h-full antialiased`}
+      className={`${SerifFont.variable} ${InstrumentSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
