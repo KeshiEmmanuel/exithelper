@@ -280,8 +280,8 @@ export default function ChatInterface() {
         // ── No session yet — show welcome + pre-chat input ──────────────────
         <>
           <main className="mx-auto w-full max-w-[600px] font-script mb-2 text-text-primary">
-            <h1 className="text-4xl inline-flex items-center gap-2">
-              Hello Dear <MainLogo isLoading={false} />{" "}
+            <h1 className="text-4xl inline-flex items-center gap-4">
+              Hello Dear. <MainLogo isLoading={false} />{" "}
             </h1>
             <p className="text-4xl">
               Need Help in creating your exeat request?

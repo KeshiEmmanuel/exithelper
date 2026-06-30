@@ -17,7 +17,7 @@ function MainLogo({ isLoading }: { isLoading: boolean }) {
         ease: "power1.out",
       }).to(".green", {
         x: -2,
-        ease: "power3.out",
+        ease: "power3.in",
       });
     },
     { scope: SVGRef },
