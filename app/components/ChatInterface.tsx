@@ -6,7 +6,8 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
-import {  ArrowUp } from "lucide-react";
+import { ArrowUp } from "lucide-react";
+import MainLogo from "./MainLogo";
 
 const THREAD_ID_KEY = "exeat_thread_id";
 
@@ -20,7 +21,12 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-function ChatInput({ value, onChange, onSend, disabled = false }: ChatInputProps) {
+function ChatInput({
+  value,
+  onChange,
+  onSend,
+  disabled = false,
+}: ChatInputProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const resize = useCallback(() => {
@@ -66,7 +72,7 @@ function ChatInput({ value, onChange, onSend, disabled = false }: ChatInputProps
           disabled={disabled || !value.trim()}
           aria-label="Send message"
         >
-          <ArrowUp className=""  size={24}/>
+          <ArrowUp className="" size={24} />
         </button>
       </div>
     </footer>
@@ -78,7 +84,7 @@ function ChatInput({ value, onChange, onSend, disabled = false }: ChatInputProps
 // changing `id` prop and never silently re-initialises mid-conversation.
 
 interface ActiveChatProps {
-  threadId: string;       // guaranteed non-null at this point
+  threadId: string; // guaranteed non-null at this point
   firstMessage: string | null; // queued message from the pre-chat input
   onReset: () => void;
 }
@@ -112,7 +118,12 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
   }, []);
 
   // ── Stop any in-flight stream on unmount (prevents zombie requests) ───────
-  useEffect(() => () => { stop(); }, [stop]);
+  useEffect(
+    () => () => {
+      stop();
+    },
+    [stop],
+  );
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -128,7 +139,9 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
 
   const handleReset = () => {
     stop(); // cancel any in-flight request before unmounting
-    try { sessionStorage.removeItem(THREAD_ID_KEY); } catch {}
+    try {
+      sessionStorage.removeItem(THREAD_ID_KEY);
+    } catch {}
     onReset(); // parent sets threadId → null → this component unmounts
   };
 
@@ -152,7 +165,7 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
       >
         {messages.map((msg) => {
           const hasText = msg.parts?.some(
-            (p) => p.type === "text" && p.text.length > 0
+            (p) => p.type === "text" && p.text.length > 0,
           );
           const isProcessingTool =
             !hasText && msg.parts?.some((p) => p.type === "tool-invocation");
@@ -170,19 +183,24 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
           Show the typing indicator only while waiting for the first token.
           Once streaming begins the live text is visible, so we hide it.
         */}
-      {status === "submitted" && (
-  <div className=" px-4 py-3">
-    <div className="flex justify-start">
-      <p className="text-gray-400 font-script  animate-pulse">Alex is thinking...</p>
-    </div>
-  </div>
-)}
+        {status === "submitted" && (
+          <div className=" px-4 py-3">
+            <div className="flex justify-start">
+              <p className="font-script inline-flex items-center gap-3">
+                <MainLogo isLoading={true} />
+                <span className="text-gray-400  animate-pulse">
+                  Alex is thinking...
+                </span>
+              </p>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="font-script" role="alert">
             {error.message || "Something went wrong."}
             <button onClick={clearError} className="underline ml-2">
-Retry
+              Retry
             </button>
           </div>
         )}
@@ -226,7 +244,9 @@ export default function ChatInterface() {
     if (!trimmed) return;
 
     const id = uuidv4();
-    try { sessionStorage.setItem(THREAD_ID_KEY, id); } catch {}
+    try {
+      sessionStorage.setItem(THREAD_ID_KEY, id);
+    } catch {}
 
     // Batch these so ActiveChat receives both on the same render.
     setFirstMessage(trimmed);
@@ -260,8 +280,12 @@ export default function ChatInterface() {
         // ── No session yet — show welcome + pre-chat input ──────────────────
         <>
           <main className="mx-auto w-full max-w-[600px] font-script mb-2 text-text-primary">
-          <h1 className="text-4xl inline-flex gap-2">Hello Dear <img src="/logo.svg" alt="logo"/> </h1>
-          <p  className="text-4xl">Need Help in creating your exeat request?</p>
+            <h1 className="text-4xl inline-flex items-center gap-2">
+              Hello Dear <MainLogo isLoading={false} />{" "}
+            </h1>
+            <p className="text-4xl">
+              Need Help in creating your exeat request?
+            </p>
           </main>
 
           <ChatInput value={input} onChange={setInput} onSend={startSession} />
