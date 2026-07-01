@@ -214,10 +214,6 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
         onSend={handleSend}
         disabled={isLoading}
       />
-      <small className="text-center text-gray-600  py-2">
-        this is a demo tool...the real tool is used by an organization..read
-        more here
-      </small>
     </>
   );
 }
@@ -293,6 +289,10 @@ export default function ChatInterface() {
           </main>
 
           <ChatInput value={input} onChange={setInput} onSend={startSession} />
+          <small className="text-center text-gray-600 font-instrument  py-2">
+            this is a demo tool...the real tool is used by an organization..read
+            more here
+          </small>
         </>
       )}
     </div>
