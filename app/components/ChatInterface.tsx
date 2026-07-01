@@ -214,7 +214,7 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
         onSend={handleSend}
         disabled={isLoading}
       />
-      <small className="text-center py-2">
+      <small className="text-center text-gray-600  py-2">
         this is a demo tool...the real tool is used by an organization..read
         more here
       </small>

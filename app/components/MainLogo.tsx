@@ -10,6 +10,7 @@ function MainLogo({ isLoading }: { isLoading: boolean }) {
     () => {
       const tl = gsap.timeline({
         delay: 0.7,
+        // repeat: -1,
         repeat: isLoading ? -1 : 0,
       });
       tl.to(".green", {
@@ -17,7 +18,7 @@ function MainLogo({ isLoading }: { isLoading: boolean }) {
         ease: "power1.out",
       }).to(".green", {
         x: -2,
-        ease: "power3.in",
+        ease: "power2.in",
       });
     },
     { scope: SVGRef },
