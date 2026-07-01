@@ -49,7 +49,7 @@ function ChatInput({
   };
 
   return (
-    <footer className="mb-10">
+    <footer>
       <div className="max-w-150 mx-auto  w-full h-42.5 bg-white flex flex-col textbox_shadow px-5 py-4">
         <textarea
           ref={ref}
@@ -214,6 +214,10 @@ function ActiveChat({ threadId, firstMessage, onReset }: ActiveChatProps) {
         onSend={handleSend}
         disabled={isLoading}
       />
+      <small className="text-center py-2">
+        this is a demo tool...the real tool is used by an organization..read
+        more here
+      </small>
     </>
   );
 }
