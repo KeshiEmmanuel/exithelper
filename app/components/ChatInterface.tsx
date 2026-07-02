@@ -270,17 +270,23 @@ export default function ChatInterface() {
   return (
     <div className="chat-shell flex flex-col justify-center  h-screen w-full">
       {threadId ? (
-        // ── Active session ──────────────────────────────────────────────────
-        <ActiveChat
-          threadId={threadId}
-          firstMessage={firstMessage}
-          onReset={handleReset}
-        />
+        <>
+          <ActiveChat
+            threadId={threadId}
+            firstMessage={firstMessage}
+            onReset={handleReset}
+          />
+          <small className="text-center text-gray-600 font-instrument  py-2">
+            this is a demo tool...the real tool is used by an organization..read
+            more here
+          </small>
+        </>
       ) : (
+        // ── Active session ──────────────────────────────────────────────────
         // ── No session yet — show welcome + pre-chat input ──────────────────
         <>
           <main className="mx-auto w-full max-w-[600px] font-script mb-2 text-text-primary">
-            <h1 className="text-4xl inline-flex items-center gap-4">
+            <h1 className="text-4xl inline-flex items-center gap-3">
               Hello Dear. <MainLogo isLoading={false} />{" "}
             </h1>
             <p className="text-4xl">
@@ -290,8 +296,14 @@ export default function ChatInterface() {
 
           <ChatInput value={input} onChange={setInput} onSend={startSession} />
           <small className="text-center text-gray-600 font-instrument  py-2">
-            this is a demo tool...the real tool is used by an organization..read
-            more here
+            this is a demo tool...the real tool is used by an organization..
+            <a
+              href="https://docs.google.com/document/d/12xR4fDMIqJiejMMlluplFgRlF8nkvTVQ/edit?usp=drive_link&ouid=101487458347928588235&rtpof=true&sd=true"
+              target="_blank"
+              className="font-medium"
+            >
+              read more here
+            </a>
           </small>
         </>
       )}
