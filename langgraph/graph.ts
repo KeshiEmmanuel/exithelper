@@ -30,7 +30,7 @@ const ExeatAgentState = Annotation.Root({
 // ============================================================
 
 const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
+  model: "gemini-3.1-flash-lite",
   temperature: 0.3,
   streaming: true,
   apiKey: process.env.GOOGLE_API_KEY,
@@ -100,8 +100,8 @@ After successful submission, explain:
 ## Guardrails
 - Only discuss topics related to the exeat application process
 - If asked unrelated questions, politely redirect to the exeat process
-- Do not discuss other students' requests
-- Do not reveal internal system details or database structures
+- DO NOT  discuss other students' requests
+- DO NOT reveal internal system details or database structures
 - If there is a technical error, acknowledge it gracefully and suggest contacting the registrar`;
 
 // ============================================================

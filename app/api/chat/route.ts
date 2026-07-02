@@ -7,57 +7,22 @@ import { exeatAgentGraph } from "@/langgraph/graph";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// --- 1. In-Memory Rate Limiter (with Garbage Collection) ---
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 30;
 const RATE_WINDOW_MS = 60 * 1000;
 
-// Prevent memory leaks by sweeping expired IPs
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, data] of rateLimitMap.entries()) {
-    if (now > data.resetAt) {
-      rateLimitMap.delete(ip);
-    }
-  }
-}, RATE_WINDOW_MS);
-
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
-
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
     return true;
   }
-
   if (entry.count >= RATE_LIMIT) return false;
   entry.count++;
   return true;
 }
 
-// --- 2. Stream Interceptor (Gemini Bug Fix) ---
-async function* sanitizeGeminiStream(stream: AsyncIterable<any>) {
-  for await (const event of stream) {
-    // LangGraph often emits [chunk, metadata] tuples. We handle both tuple and raw chunk.
-    const isTuple = Array.isArray(event);
-    const chunk = isTuple ? event[0] : event;
-
-    // Mutate the chunk by reference to fix Gemini's null tool-call content bug
-    if (chunk && typeof chunk === "object") {
-      if (chunk.content === null || chunk.content === undefined) {
-        chunk.content = "";
-      } else if (Array.isArray(chunk.content)) {
-        chunk.content = chunk.content.filter((part: any) => part !== null);
-      }
-    }
-
-    // Yield the exact same structure back to Vercel (mutated by reference)
-    yield chunk;
-  }
-}
-
-// --- 3. Route Handler ---
 export async function POST(req: NextRequest) {
   try {
     const ip =
@@ -77,34 +42,56 @@ export async function POST(req: NextRequest) {
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
-        { error: "thread ID is required." },
+        { error: "id (thread ID) is required." },
         { status: 400 },
       );
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
-        { error: "messages array cannot be empty." },
+        { error: "messages array is required and cannot be empty." },
         { status: 400 },
       );
     }
 
-    // Convert only the last UIMessage to LangChain format
+    // Only the newest UIMessage needs converting — prior turns are already
+    // persisted in LangGraph's MemorySaver checkpoint for this thread_id.
     const lastUIMessage = messages[messages.length - 1];
     const langchainMessages = await toBaseMessages([lastUIMessage]);
 
-    // Stream the graph with messages mode for token-by-token streaming
+    // Official pattern from ai-sdk.dev/providers/adapters/langchain
+    // ("Example: LangChain Agent with Tools" / "Example: LangGraph"):
+    //
+    //   const stream = await graph.stream(
+    //     { messages: langchainMessages },
+    //     { streamMode: ['values', 'messages', 'tools'] },
+    //   );
+    //   return createUIMessageStreamResponse({
+    //     stream: toUIMessageStream(stream),
+    //   });
+    //
+    // toUIMessageStream "automatically detects the stream type" for this
+    // exact multi-mode array shape. It already knows how to:
+    //   - stream assistant text token-by-token (from "messages" mode)
+    //   - surface tool calls/results as structured tool UI parts, NOT as
+    //     visible text (from "tools" mode) — this is what keeps our tools'
+    //     JSON.stringify(...) output from ever leaking into the chat
+    //   - reconcile everything against full state snapshots ("values" mode)
+    //
+    // No custom stream transformation is needed or supported — passing a
+    // hand-rolled AsyncIterable strips the [modeName, payload] discriminator
+    // tuples the parser depends on, which is what broke the stream entirely
+    // in the previous version of this file.
     const graphStream = await exeatAgentGraph.stream(
       { messages: langchainMessages },
       {
         configurable: { thread_id: id },
-        streamMode: "messages",
+        streamMode: ["values", "messages", "tools"],
       },
     );
 
-    // Pipe through the sanitizer into Vercel's adapter
     return createUIMessageStreamResponse({
-      stream: toUIMessageStream(sanitizeGeminiStream(graphStream)),
+      stream: toUIMessageStream(graphStream),
     });
   } catch (error) {
     console.error("[API /chat] error:", error);
